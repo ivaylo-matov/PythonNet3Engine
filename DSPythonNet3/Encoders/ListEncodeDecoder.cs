@@ -98,7 +98,7 @@ namespace DSPythonNet3.Encoders
             try
             {
                 clrObject = pyObj.GetManagedObject();
-                return true;
+                return clrObject != null;
             }
             catch
             {
