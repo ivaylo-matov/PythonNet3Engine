@@ -1,8 +1,6 @@
 using System.Collections;
-using DSPythonNet3;
-using DSPythonNet3.Encoders;
 using NUnit.Framework;
-using Python.Runtime;
+using DSPythonNet3;
 
 namespace DSPythonNet3Tests
 {
@@ -13,35 +11,46 @@ namespace DSPythonNet3Tests
         {
             DSPythonNet3Evaluator.InitializePython();
 
-            using (Py.GIL())
-            using (var scope = Py.CreateScope())
+            string code = @"
+import clr
+clr.AddReference('DSCoreNodes')
+from DSCore import List
+
+data = [[1, 2, 3], [4, 5, 6]]
+OUT = data, List.Flatten(data, -1)
+";
+            var empty = new ArrayList();
+            var expected = new ArrayList
             {
-                scope.Exec("value = [[1, [2, 3]], ['a', ['b']]]");
-                using var pyList = scope.Get("value");
+                new ArrayList
+                {
+                    new ArrayList { 1, 2, 3 },
+                    new ArrayList { 4, 5, 6 }
+                },
+                new ArrayList { 1, 2, 3, 4, 5, 6 }
+            };
 
-                var decoder = new ListEncoderDecoder();
-                var success = decoder.TryDecode(pyList, out IList result);
+            var result = DSPythonNet3Evaluator.EvaluatePythonScript(code, empty, empty);
+            Assert.That(result, Is.InstanceOf<IEnumerable>());
 
-                Assert.That(success, Is.True);
-                Assert.That(result, Is.InstanceOf<IList>());
+            var normalizedResult = NormalizeResult(result);
+            CollectionAssert.AreEqual(expected, normalizedResult as IEnumerable);
+        }
 
-                var first = result[0] as IList;
-                Assert.That(first, Is.Not.Null);
-                Assert.That(first[0], Is.EqualTo(1));
-
-                var secondLevel = first?[1] as IList;
-                Assert.That(secondLevel, Is.Not.Null);
-                Assert.That(secondLevel?[0], Is.EqualTo(2));
-                Assert.That(secondLevel?[1], Is.EqualTo(3));
-
-                var second = result[1] as IList;
-                Assert.That(second, Is.Not.Null);
-                Assert.That(second?[0], Is.EqualTo("a"));
-
-                var thirdLevel = second?[1] as IList;
-                Assert.That(thirdLevel, Is.Not.Null);
-                Assert.That(thirdLevel?[0], Is.EqualTo("b"));
+        private static object NormalizeResult(object value)
+        {
+            if (value is string || value is not IEnumerable enumerable)
+            {
+                return value;
             }
+
+            var list = new ArrayList();
+            foreach (var item in enumerable)
+            {
+                list.Add(NormalizeResult(item));
+            }
+
+            return list;
         }
     }
 }
