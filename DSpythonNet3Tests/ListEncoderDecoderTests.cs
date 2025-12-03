@@ -16,17 +16,33 @@ import clr
 clr.AddReference('DSCoreNodes')
 from DSCore import List
 
-data = [[1, 2, 3], [4, 5, 6]]
-OUT = data, List.Flatten(data, -1)
+data = [[[1, 2], [3]], [[4, 5], [6]]]
+OUT = data, List.Flatten(data, 1), List.Flatten(data, 2), List.Flatten(data, -1)
 ";
             var empty = new ArrayList();
             var expected = new ArrayList
             {
                 new ArrayList
                 {
-                    new ArrayList { 1, 2, 3 },
-                    new ArrayList { 4, 5, 6 }
+                    new ArrayList
+                    {
+                        new ArrayList { 1, 2 },
+                        new ArrayList { 3 }
+                    },
+                    new ArrayList
+                    {
+                        new ArrayList { 4, 5 },
+                        new ArrayList { 6 }
+                    }
                 },
+                new ArrayList
+                {
+                    new ArrayList { 1, 2 },
+                    new ArrayList { 3 },
+                    new ArrayList { 4, 5 },
+                    new ArrayList { 6 }
+                },
+                new ArrayList { 1, 2, 3, 4, 5, 6 },
                 new ArrayList { 1, 2, 3, 4, 5, 6 }
             };
 
