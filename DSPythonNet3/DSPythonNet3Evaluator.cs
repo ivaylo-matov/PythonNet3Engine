@@ -514,12 +514,17 @@ sys.stdout = DynamoStdOut({0})
         /// </summary>
         private static void InitializeEncoders()
         {
-            var shared = new object[] { new ListEncoderDecoder() };
-            var encoders = shared.Cast<IPyObjectEncoder>().ToArray();
-            var decoders = shared.Cast<IPyObjectDecoder>().Concat(new IPyObjectDecoder[]
+            var listEncoderDecoder = new ListEncoderDecoder();
+            var encoders = new IPyObjectEncoder[]
             {
+                listEncoderDecoder,
+                new ConnectionNodeObjectEncoder()
+            };
+            var decoders = new IPyObjectDecoder[]
+            {
+                listEncoderDecoder,
                 new DictionaryDecoder()
-            }).ToArray();
+            };
             Array.ForEach(encoders, e => PyObjectConversions.RegisterEncoder(e));
             Array.ForEach(decoders, d => PyObjectConversions.RegisterDecoder(d));
         }
