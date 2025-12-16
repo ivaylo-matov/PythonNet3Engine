@@ -804,33 +804,61 @@ sys.stdout = DynamoStdOut({0})
         /// </summary>
         private static string ConnectionNodeCompatPatchCode()
         {
-            // Keep this snippet extremely defensive: it should be a no-op if the library isn't present
-            // or if the runtime forbids monkey-patching reflected CLR types.
+            // Keep this snippet extremely defensive: it should be a no-op if the library isn't present.
+            // IMPORTANT: Many runtimes forbid setting attributes on CLR *types*. However, Python.NET
+            // typically allows attaching attributes to CLR *instances* via the wrapper's __dict__.
+            // So we patch instances coming in through IN (recursively for nested lists).
             return $@"
 import builtins as __builtins__
-if not getattr(__builtins__, '{ConnectionNodeCompatSentinel}', False):
-    try:
-        from AdvanceSteel.ConnectionAutomation.Nodes import ConnectionNode as __ConnectionNode
 
-        def __bind_node_first_static(__name):
+try:
+    from AdvanceSteel.ConnectionAutomation.Nodes import ConnectionNode as __ConnectionNode
+except Exception:
+    __ConnectionNode = None
+
+if __ConnectionNode is not None:
+    if not getattr(__builtins__, '{ConnectionNodeCompatSentinel}', False):
+        def __dspynet3__patch_connnode_instance(__obj):
+            # Attach instance-callable wrappers for node-first static methods.
             try:
-                __orig = getattr(__ConnectionNode, __name)
-            except Exception:
-                return
+                if not isinstance(__obj, __ConnectionNode):
+                    return
 
-            def __inst(self, *args, __orig=__orig, **kwargs):
-                return __orig(self, *args, **kwargs)
+                # Only patch if missing or still the raw reflected method.
+                def __subnodes(__n, __obj=__obj):
+                    return __ConnectionNode.SubNodesOfSize(__obj, __n)
 
-            try:
-                setattr(__ConnectionNode, __name, __inst)
+                def __existing(__obj=__obj):
+                    return __ConnectionNode.ExistingConnections(__obj)
+
+                try:
+                    setattr(__obj, 'SubNodesOfSize', __subnodes)
+                except Exception:
+                    pass
+                try:
+                    setattr(__obj, 'ExistingConnections', __existing)
+                except Exception:
+                    pass
             except Exception:
-                # Some runtimes may forbid setting attributes on CLR types.
                 pass
 
-        __bind_node_first_static('SubNodesOfSize')
-        __bind_node_first_static('ExistingConnections')
+        def __dspynet3__walk_and_patch(__x):
+            try:
+                if isinstance(__x, (list, tuple)):
+                    for __i in __x:
+                        __dspynet3__walk_and_patch(__i)
+                else:
+                    __dspynet3__patch_connnode_instance(__x)
+            except Exception:
+                pass
 
+        setattr(__builtins__, '__dspynet3__walk_and_patch_connnode', __dspynet3__walk_and_patch)
         setattr(__builtins__, '{ConnectionNodeCompatSentinel}', True)
+
+    # Patch current inputs for this evaluation (IN exists in the module scope).
+    try:
+        __inp = globals().get('IN', None)
+        __builtins__.__dspynet3__walk_and_patch_connnode(__inp)
     except Exception:
         pass
 ";
