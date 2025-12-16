@@ -794,6 +794,47 @@ sys.stdout = DynamoStdOut({0})
         public override event EvaluationFinishedEventHandler EvaluationFinished;
 
         private bool registeredUnwrapMarshaler;
+        private const string ConnectionNodeCompatSentinel = "__dspynet3_connnode_compat__";
+
+        /// <summary>
+        /// Compatibility shim for "node-first" static methods exposed by some Dynamo/Revit libraries.
+        /// In older engines these could be invoked like instance methods (e.g. node.SubNodesOfSize(2)).
+        /// Python.NET 3 binds static methods strictly, so we patch a small set of known APIs to keep
+        /// existing graphs working.
+        /// </summary>
+        private static string ConnectionNodeCompatPatchCode()
+        {
+            // Keep this snippet extremely defensive: it should be a no-op if the library isn't present
+            // or if the runtime forbids monkey-patching reflected CLR types.
+            return $@"
+import builtins as __builtins__
+if not getattr(__builtins__, '{ConnectionNodeCompatSentinel}', False):
+    try:
+        from AdvanceSteel.ConnectionAutomation.Nodes import ConnectionNode as __ConnectionNode
+
+        def __bind_node_first_static(__name):
+            try:
+                __orig = getattr(__ConnectionNode, __name)
+            except Exception:
+                return
+
+            def __inst(self, *args, __orig=__orig, **kwargs):
+                return __orig(self, *args, **kwargs)
+
+            try:
+                setattr(__ConnectionNode, __name, __inst)
+            except Exception:
+                # Some runtimes may forbid setting attributes on CLR types.
+                pass
+
+        __bind_node_first_static('SubNodesOfSize')
+        __bind_node_first_static('ExistingConnections')
+
+        setattr(__builtins__, '{ConnectionNodeCompatSentinel}', True)
+    except Exception:
+        pass
+";
+        }
 
         /// <summary>
         /// Called immediately before evaluation starts
@@ -839,6 +880,9 @@ sys.stdout = DynamoStdOut({0})
 
                 registeredUnwrapMarshaler = true;
             }
+
+            // Apply compatibility shims (safe no-op if unavailable).
+            scope.Exec(ConnectionNodeCompatPatchCode());
         }
 
         /// <summary>
