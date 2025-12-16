@@ -79,6 +79,7 @@ namespace DSPythonNet3.Encoders
             return decodableTypes.IndexOf(targetType) >= 0;
         }
 
+        // converts a PyObject (list or tuple) to an ArrayList
         private static IList ConvertToArrayList(PyObject pyObj)
         {
             using var pyList = PyList.AsList(pyObj);
@@ -93,6 +94,7 @@ namespace DSPythonNet3.Encoders
             return result;
         }
 
+        // converts a PyObject item to a CLR object
         private static object ConvertItem(PyObject item)
         {
             if (TryGetClrObject(item, out var clrObject))
@@ -129,6 +131,7 @@ namespace DSPythonNet3.Encoders
             return item.AsManagedObject(typeof(object));
         }
 
+        // safely asks a PyObject for its managed object
         private static bool TryGetClrObject(PyObject pyObj, out object clrObject)
         {
             try
@@ -148,6 +151,7 @@ namespace DSPythonNet3.Encoders
             }
         }
 
+        // convert each element for generic lists
         private static object ConvertGenericItem(PyObject item, Type elementType)
         {
             if (elementType == typeof(object))
