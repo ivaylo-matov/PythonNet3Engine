@@ -825,11 +825,11 @@ if __ConnectionNode is not None:
                     return
 
                 # Only patch if missing or still the raw reflected method.
-                def __subnodes(__n, __obj=__obj):
-                    return __ConnectionNode.SubNodesOfSize(__obj, __n)
+                def __subnodes(__n, *args, __obj=__obj, **kwargs):
+                    return __ConnectionNode.SubNodesOfSize(__obj, __n, *args, **kwargs)
 
-                def __existing(__obj=__obj):
-                    return __ConnectionNode.ExistingConnections(__obj)
+                def __existing(*args, __obj=__obj, **kwargs):
+                    return __ConnectionNode.ExistingConnections(__obj, *args, **kwargs)
 
                 try:
                     setattr(__obj, 'SubNodesOfSize', __subnodes)
